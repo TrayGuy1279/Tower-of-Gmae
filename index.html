@@ -215,7 +215,7 @@ body{font-family:var(--font);color:var(--text);font-size:13px;
 .skill-icon{width:13px;height:13px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;line-height:1;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.35);color:rgba(255,255,255,.9);transition:opacity .15s,transform .15s}
 .skill-icon.ready{border-color:var(--purple);box-shadow:0 0 4px 1px rgba(155,109,255,.4)}
 .skill-icon.cd{opacity:.35;filter:grayscale(1)}
-.hud-strip{height:26%;min-height:150px;display:flex;border-top:2px solid var(--border);background:var(--bg2);flex-shrink:0}
+.hud-strip{height:18%;min-height:96px;display:flex;border-top:2px solid var(--border);background:var(--bg2);flex-shrink:0}
 .hud-col{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:6px 8px}
 .hud-col-label{font-size:9px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--text2);margin-bottom:4px;flex-shrink:0}
 .hud-divider{width:1.5px;background:var(--border);flex-shrink:0}
@@ -1369,25 +1369,18 @@ function renderHUD(){
     const role=G.formation[h.id]||"core";
     const holding=isHoldingObjective(h.id);
     const roleTag=holding?`<span style="font-size:7px;color:var(--purple-tx);border:1px solid var(--purple-br);border-radius:3px;padding:0 3px">OBJ</span>`:(role==="frontline"?`<span style="font-size:7px;color:var(--red-tx);border:1px solid var(--red-br);border-radius:3px;padding:0 3px">FRONT</span>`:role==="backline"?`<span style="font-size:7px;color:var(--text2);border:1px solid var(--border);border-radius:3px;padding:0 3px">BACK</span>`:`<span style="font-size:7px;color:var(--green-tx);border:1px solid var(--green-br);border-radius:3px;padding:0 3px">CORE</span>`);
-    const hpPct=Math.max(0,Math.round(h.hp/h.maxHp*100));const stPct=Math.max(0,Math.round(h.sta/h.maxSta*100));
-    const hpC=hpPct>50?"var(--green)":hpPct>25?"#EF9F27":"var(--red)";
-    const activeS=h.skills.filter(s=>!PASSIVE.has(s));
-    const pips=activeS.map(()=>`<div class="cooldown-pip${h.sta>=20?" ready":""}"></div>`).join("");
+    const stPct=Math.max(0,Math.round(h.sta/h.maxSta*100));
     const chips=(h.sfx||[]).map(s=>`<span class="schip schip-${s.type}">${s.type}</span>`).join("");
     return`<div class="hud-hero-row">
       <div class="hud-name-row">${roleTag}<span class="hud-hero-name">${h.hp<=0?"✕ ":""}${h.name} <span style="font-weight:400;color:var(--text2)">Lv${h.lv}</span></span><span style="font-size:8px;color:var(--gold)">${"★".repeat(base.rarity+1)}</span></div>
-      <div class="hud-bar-track"><div class="hud-bar-fill" style="width:${hpPct}%;background:${hpC}"></div></div>
       <div class="hud-bar-track" style="height:3px"><div class="hud-bar-fill" style="width:${stPct}%;background:var(--purple)"></div></div>
-      ${pips?`<div class="cooldown-row">${pips}</div>`:""}
       ${chips?`<div class="hud-status-row">${chips}</div>`:""}
     </div>`;
   }).join("")||`<div class="empty" style="font-size:9px;padding:10px">No active run</div>`;
   eRows.innerHTML=G.curEnemies.map((e,i)=>{
-    const hpPct=Math.max(0,Math.round(e.hp/e.maxHp*100));
     const chips=(e.sfx||[]).map(s=>`<span class="schip schip-${s.type}">${s.type}</span>`).join("");
     return`<div class="hud-enemy-row">
       <div class="hud-name-row"><span class="hud-hero-name">${e.hp<=0?"✕ ":""}${e.isBoss?"⚠ ":""}${edn(e)}</span></div>
-      <div class="hud-bar-track"><div class="hud-bar-fill" style="width:${hpPct}%;background:${e.isBoss?"var(--gold)":"var(--red)"}"></div></div>
       ${chips?`<div class="hud-status-row">${chips}</div>`:""}
     </div>`;
   }).join("")||`<div class="empty" style="font-size:9px;padding:10px">—</div>`;
