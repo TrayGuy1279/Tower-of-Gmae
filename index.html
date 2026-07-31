@@ -2421,14 +2421,30 @@ function updateNav(){
   const t=document.getElementById("nav-tok"),f=document.getElementById("nav-fl"),h=document.getElementById("nav-h");
   if(t)t.textContent=G.tok;if(f)f.textContent=G.highFloor;if(h)h.textContent=G.roster.length;
 }
+const AUTO_SAVE_KEY=SAVE_PREFIX+"auto";
+function autoSaveNow(){
+  try{ localStorage.setItem(AUTO_SAVE_KEY, serializeState()); }catch(e){ /* storage full or unavailable — fail silently, manual slots still work */ }
+}
+function tryAutoResume(){
+  try{
+    const raw=localStorage.getItem(AUTO_SAVE_KEY);
+    if(raw){ deserializeState(raw); return true; }
+  }catch(e){}
+  return false;
+}
 function initGame(){
   initPool();
+  const resumed=tryAutoResume();
   updateNav();
   startWander();
   setInterval(tickSessions,3000);
   setInterval(checkRaidResolve,5000);
+  setInterval(autoSaveNow,30000);
+  document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden") autoSaveNow(); });
+  window.addEventListener("beforeunload",autoSaveNow);
   applyNav();
   applyBuildingUnlocks();
+  if(resumed) showToast("Welcome back!","success");
 }
 document.addEventListener("DOMContentLoaded",initGame);
 /* ---- gap-fill: functions referenced throughout but not yet defined above ---- */
@@ -5165,6 +5181,22 @@ Object.assign(SDESC,{
   "Holy Ward":"Passive: a protective blessing lightly reduces damage taken.",
 });
 ["Holy Ward"].forEach(s=>PASSIVE.add(s));
+</script>
+<script>
+/* ============================================================
+   Pass 38 — extra autosave triggers at meaningful moments
+   ============================================================ */
+const _prevEndCombatP38=endCombat;
+endCombat=function(victory,floor){
+  _prevEndCombatP38(victory,floor);
+  autoSaveNow();
+};
+const _prevExecPullP38=execPull;
+execPull=function(){
+  const h=_prevExecPullP38();
+  autoSaveNow();
+  return h;
+};
 </script>
 <script>
 if ("serviceWorker" in navigator) {
