@@ -336,7 +336,6 @@ body{font-family:var(--font);color:var(--text);font-size:13px;
     <div class="p8" style="border-bottom:1.5px solid var(--border)" id="capture-box"></div>
     <div class="p8" style="border-bottom:1.5px solid var(--border)" id="meal-box"></div>
     <div class="p8" style="border-bottom:1.5px solid var(--border)" id="potion-box"></div>
-    <div class="scroll p8" style="flex:1" id="formation-editor"></div>
     <div class="p8"><button class="btn btn-g" id="run-btn" onclick="startRun()" style="width:100%;font-weight:700">▶ Start floor run</button></div>
   </div>
   <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative">
@@ -362,6 +361,9 @@ body{font-family:var(--font);color:var(--text);font-size:13px;
         <button class="btn" id="spd-btn" onclick="cycleSpd()">1×</button>
         <button class="btn" onclick="clearLog()">Clear</button>
       </div>
+    </div>
+    <div class="scroll p8" id="formation-slot" style="max-height:34%;border-top:1.5px solid var(--border);background:var(--bg2)">
+      <div id="formation-editor"></div>
     </div>
     <div class="p8" style="border-top:1.5px solid var(--border);background:var(--bg2);display:flex;align-items:center;gap:8px">
       <div style="font-size:9px;color:var(--text2)" id="loot-label">Last clear</div>
@@ -1646,6 +1648,7 @@ function startRun(){
   });
   G.combatSpd=G.settings.defaultSpeed;spdIdx=spdCycle.indexOf(G.combatSpd);if(spdIdx<0)spdIdx=0;const sb=document.getElementById("spd-btn");if(sb)sb.textContent=G.combatSpd+"×";
   G.combatActive=true;G.lootGold=0;G.lootTok=0;G.floorLoot={};G.floorXP={};
+  const fSlot=document.getElementById("formation-slot");if(fSlot)fSlot.style.display="none";
   document.getElementById("dg").textContent="0";document.getElementById("dt").textContent="0";
   document.getElementById("ldot").style.opacity="1";
   const floor=G.farmMode?G.runFloor:(G.highFloor+1);
@@ -2904,6 +2907,7 @@ function completeSession(sid){
 /* ==================== 6. REPLAY REWARD REDUCTION + WEAPON-INSTANCE-COMPATIBLE endCombat ==================== */
 function endCombat(victory,floor){
   G.combatActive=false;
+  const fSlot=document.getElementById("formation-slot");if(fSlot)fSlot.style.display="";
   G.cHeroes.forEach(ch=>{const r=G.roster.find(x=>x.id===ch.id);if(r&&ch.isAlive){
     const hpFrac=ch.maxHp>0?ch.hp/ch.maxHp:1;const staFrac=ch.maxSta>0?ch.sta/ch.maxSta:1;
     r.skills=[...ch.skills];r.skillLv={...ch.skillLv};r.skillEvolved={...(ch.skillEvolved||{})};r.ic={...ch.ic};r.lv=ch.lv;r.xp=ch.xp;
