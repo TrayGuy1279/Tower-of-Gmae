@@ -733,7 +733,7 @@ const HYBRID_CLASSES={
   "Warrior|Rogue":"Duelist","Warrior|Ranger":"Vanguard","Rogue|Ranger":"Trickshot",
 };
 function hybridClassFor(clsA,clsB){return HYBRID_CLASSES[clsA+"|"+clsB]||HYBRID_CLASSES[clsB+"|"+clsA]||null;}
-function classPrimaryStat(cls){return cls==="Mage"?"mana":cls==="Rogue"?"agi":"str";}
+function classPrimaryStat(cls){return(cls==="Mage"||cls==="Cleric")?"mana":cls==="Rogue"?"agi":"str";}
 
 let G={
   tok:30,freePull:true,freePullResetAt:0,p5:0,p4:0,gPulled:{},pool:{0:[],1:[],2:[],3:[],4:[]},
@@ -814,6 +814,7 @@ function applyClassStatBonus(h,amount){
   else if(h.cls==="Ranger"){h.str=(h.str||0)+Math.round(amount*0.8);h.agi=(h.agi||0)+Math.round(amount*0.2);}
   else if(h.cls==="Rogue"){h.agi=(h.agi||0)+Math.round(amount*0.8);h.str=(h.str||0)+Math.round(amount*0.2);}
   else if(h.cls==="Mage")h.mana=(h.mana||0)+amount;
+  else if(h.cls==="Cleric")h.mana=(h.mana||0)+amount;
   else h.str=(h.str||0)+amount;
 }
 function classPowerStat(h){
@@ -1132,7 +1133,7 @@ function renderPartySlots(){
 function defaultRole(h){
   if(!h)return"core";
   if(h.cls==="Warrior")return"frontline";
-  if(h.cls==="Mage")return"backline";
+  if(h.cls==="Mage"||h.cls==="Cleric")return"backline";
   return"core";
 }
 function isHeroInAnyParty(id){
