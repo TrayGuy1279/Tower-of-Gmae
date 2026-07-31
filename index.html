@@ -363,17 +363,6 @@ body{font-family:var(--font);color:var(--text);font-size:13px;
         <button class="btn" onclick="clearLog()">Clear</button>
       </div>
     </div>
-    <div class="hud-strip">
-      <div class="hud-col" id="hud-party">
-        <div class="hud-col-label">Party</div>
-        <div class="scroll" style="flex:1" id="hud-party-rows"></div>
-      </div>
-      <div class="hud-divider"></div>
-      <div class="hud-col" id="hud-enemies">
-        <div class="hud-col-label">Enemies</div>
-        <div class="scroll" style="flex:1" id="hud-enemy-rows"></div>
-      </div>
-    </div>
     <div class="p8" style="border-top:1.5px solid var(--border);background:var(--bg2);display:flex;align-items:center;gap:8px">
       <div style="font-size:9px;color:var(--text2)" id="loot-label">Last clear</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;flex:1" id="loot-chips"><span style="font-size:10px;color:var(--text2)">—</span></div>
@@ -630,8 +619,8 @@ function addInvItem(id,qty,meta,cat){
 }
 const RC=[{bg:"#D3D1C7",tx:"#444441"},{bg:"#9FE1CB",tx:"#085041"},{bg:"#B5D4F4",tx:"#0C447C"},{bg:"#FAC775",tx:"#633806"},{bg:"#CECBF6",tx:"#3C3489"},{bg:"#1A1A2E",tx:"#CECBF6"}];
 const CLASSES=["Warrior","Rogue","Ranger","Mage","Cleric"];
-const CLASS_ICON_SM={Warrior:ico('sword',13),Rogue:ico('dagger',13),Ranger:ico('bow',13),Mage:ico('orb',13)};
-const CLASS_ICON_LG={Warrior:ico('sword',20),Rogue:ico('dagger',20),Ranger:ico('bow',20),Mage:ico('orb',20)};
+const CLASS_ICON_SM={Warrior:ico('sword',13),Rogue:ico('dagger',13),Ranger:ico('bow',13),Mage:ico('orb',13),Cleric:extraIco('mace1',13)};
+const CLASS_ICON_LG={Warrior:ico('sword',20),Rogue:ico('dagger',20),Ranger:ico('bow',20),Mage:ico('orb',20),Cleric:extraIco('mace1',20)};
 function extraIco(name,size,color){
   size=size||16;color=color||"currentColor";
   const paths={
@@ -700,7 +689,7 @@ const FIRST_N={
 const LAST_N=["Ashveil","Blackthorn","Coldwater","Dawnmark","Emberfield","Frostholm","Graystone","Ironveil","Jadepeak","Kindlewood","Larkspur","Moonhollow","Nightshade","Oakhaven","Pemberton","Quillfeather","Ravenscar","Stormwatch","Thistlewood","Underhill","Vaneford","Whitmoor","Yewbrook","Ashgrove","Brambleton","Craghollow","Dunmore","Everfrost","Foxglenn","Galehart"];
 const IDLE=[h=>`<i>${h} checks their gear, tightening straps before pressing on.</i>`,h=>`<i>${h} pauses to catch their breath in the dim corridor.</i>`,h=>`<i>${h} glances back at the party, making sure everyone's still standing.</i>`,h=>`<i>${h} notices strange markings on the wall but says nothing.</i>`,h=>`<i>${h} wipes sweat from their brow, pressing forward.</i>`,h=>`<i>The party moves cautiously through the silence.</i>`,h=>`<i>${h} mutters something under their breath about the smell down here.</i>`,h=>`<i>A distant sound echoes — ${h} raises a hand for the group to stop.</i>`];
 const GTRACKS=[{id:"combat",label:"Combat exp",color:"#D85A30"},{id:"relations",label:"Relations",color:"#D4537E"},{id:"seals",label:"Enhancements",color:"#BA7517"},{id:"food",label:"Food & buffs",color:"#639922"},{id:"training",label:"Training",color:"#7F77DD"},{id:"equipment",label:"Equipment",color:"#378ADD"}];
-const BLD_CLASS_BONUS={blacksmith:{Warrior:15,Rogue:5,Ranger:0,Mage:-5},kitchen:{Mage:15,Rogue:10,Warrior:0,Ranger:5},research:{Mage:15,Ranger:5,Rogue:0,Warrior:-5}};
+const BLD_CLASS_BONUS={blacksmith:{Warrior:15,Rogue:5,Ranger:0,Mage:-5,Cleric:0},kitchen:{Mage:15,Rogue:10,Warrior:0,Ranger:5,Cleric:10},research:{Mage:15,Ranger:5,Rogue:0,Warrior:-5,Cleric:10}};
 const KITCHEN_RECIPES=[{id:"hearty_stew",name:"Hearty Stew",icon:ico('pot',16),desc:"+8% max HP · 3 waves",cost:{"Rat Fur":2,"Rough Cloth":1},baseTime:60000,minChefLv:1},{id:"stamina_broth",name:"Stamina Broth",icon:ico('cup',16),desc:"+10 stamina per wave",cost:{"Bone Fragment":1,"Goblin Tooth":2},baseTime:60000,minChefLv:1},{id:"mage_tonic",name:"Mage's Tonic",icon:ico('orb',16),desc:"+15% magic dmg — Mage chefs only",cost:{"Mana Crystal":2,"Holy Water":1},baseTime:90000,minChefLv:8,reqCls:"Mage"}];
 const RESEARCH_RECIPES=[{id:"study_motion",name:"Study of Motion",desc:"Gathering speed +15%",cost:{"Iron Scrap":1,"Torn Banner":2},baseTime:90000},{id:"body_limits",name:"The Body's Limits",desc:"+5 HP between waves",cost:{"Mana Crystal":1,"Bone Fragment":3},baseTime:120000},{id:"weapon_theory",name:"Weapon Theory",desc:"Crafted weapons +2 ATK",cost:{"Iron Scrap":2,"Bone Fragment":2},baseTime:180000}];
 const GATHER_ZONES=[{id:"gz_surface",name:"Surface Tunnels",desc:"Rat Fur, Bone Fragment",outputs:["Rat Fur","Bone Fragment","Rough Cloth"],time:1800,minFloor:0},{id:"gz_tribal",name:"Tribal Outskirts",desc:"Goblin Tooth, Mana Crystal",outputs:["Goblin Tooth","Mana Crystal","Crude Bowstring"],time:3600,minFloor:6},{id:"gz_citadel",name:"Citadel Ruins",desc:"Iron Scrap, Cursed Steel",outputs:["Iron Scrap","Cursed Steel","Holy Water"],time:7200,minFloor:11}];
@@ -802,7 +791,7 @@ function heroOccupied(id){return Object.values(G.sessions).some(s=>s.heroId===id
 function heroFree(h){return!G.party.includes(h.id)&&!heroOccupied(h.id)&&!h.isInjured;}
 // Universal sort: rarity → class (within rarity) → level
 function sortHeroesStd(list){return[...list].sort((a,b)=>b.rarity-a.rarity||a.cls.localeCompare(b.cls)||b.lv-a.lv);}
-const LEVEL_GROWTH={Warrior:{hp:6,str:2,agi:1,sta:2,mana:0},Rogue:{hp:3,str:1,agi:3,sta:2,mana:0},Ranger:{hp:4,str:2,agi:2,sta:2,mana:1},Mage:{hp:3,str:0,agi:1,sta:3,mana:5}};
+const LEVEL_GROWTH={Warrior:{hp:6,str:2,agi:1,sta:2,mana:0},Rogue:{hp:3,str:1,agi:3,sta:2,mana:0},Ranger:{hp:4,str:2,agi:2,sta:2,mana:1},Mage:{hp:3,str:0,agi:1,sta:3,mana:5},Cleric:{hp:4,str:0,agi:1,sta:3,mana:4}};
 function levelUpHero(h){
   const cap=h.rarity>=5?125:99;if(h.lv>=cap)return false;
   h.lv++;
@@ -1052,9 +1041,9 @@ function genHero(rarity,fixed){
     const skills=fixed.skills?[...fixed.skills]:pool.slice(0,SPR[4]);
     const maxSlots=SS[4]+(fixed.bonusSlots||(fixed.id==="louis"?3:0));
     const lp=fixed.lp||(LP[fixed.cls]&&LP[fixed.cls][fixed.wpn])||[];
-    const bHP={Warrior:120,Rogue:80,Ranger:90,Mage:75}[fixed.cls];
-    const isM=fixed.cls==="Mage";
-    return{id:"hc_"+fixed.id,name:fixed.name,namedClass:fixed.namedClass||null,cls:fixed.cls,wpn:fixed.wpn,rarity:4,hp:rand(bHP,bHP+35),maxHp:rand(bHP,bHP+35),sta:{Warrior:120,Rogue:90,Ranger:100,Mage:80}[fixed.cls],maxSta:{Warrior:120,Rogue:90,Ranger:100,Mage:80}[fixed.cls],str:isM?rand(15,25):rand(70,92),agi:rand(55,88),mana:isM?rand(90,130):rand(10,20),crit:rand(14,28),lv:1,xp:0,mentality,growth:freshGrowth(),skills:[...skills],skillLv:Object.fromEntries(skills.map(s=>[s,1])),skillEvolved:{},lp,maxSlots,ic:{ba:0,cr:0,dt:0},wm:{[fixed.wpn]:1},ruf:0,eq:null,enhancements:{},prodClass:null,craftCounts:{},hybridClass:null,isAlive:true,hc:true,isInjured:false,injFloor:0};
+    const bHP={Warrior:120,Rogue:80,Ranger:90,Mage:75,Cleric:85}[fixed.cls];
+    const isM=fixed.cls==="Mage"||fixed.cls==="Cleric";
+    return{id:"hc_"+fixed.id,name:fixed.name,namedClass:fixed.namedClass||null,cls:fixed.cls,wpn:fixed.wpn,rarity:4,hp:rand(bHP,bHP+35),maxHp:rand(bHP,bHP+35),sta:{Warrior:120,Rogue:90,Ranger:100,Mage:80,Cleric:95}[fixed.cls],maxSta:{Warrior:120,Rogue:90,Ranger:100,Mage:80,Cleric:95}[fixed.cls],str:isM?rand(15,25):rand(70,92),agi:rand(55,88),mana:isM?rand(90,130):rand(10,20),crit:rand(14,28),lv:1,xp:0,mentality,growth:freshGrowth(),skills:[...skills],skillLv:Object.fromEntries(skills.map(s=>[s,1])),skillEvolved:{},lp,maxSlots,ic:{ba:0,cr:0,dt:0},wm:{[fixed.wpn]:1},ruf:0,eq:null,enhancements:{},prodClass:null,craftCounts:{},hybridClass:null,isAlive:true,hc:true,isInjured:false,injFloor:0};
   }
   const cls=pickCls(rarity);const wpn=pick(WPN[cls]);
   const name=pick(FIRST_N[cls]||FIRST_N.Warrior)+" "+pick(LAST_N);
