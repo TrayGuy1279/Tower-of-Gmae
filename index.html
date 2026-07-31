@@ -1955,7 +1955,7 @@ function addTrainLog(icon,hero,msg,meta){trainLog.unshift({icon:tagIcon(icon),he
 const BLD_DEFS={
   kitchen:{title:"Tavern",tabs:["Cook","Sell","Buy","Log"]},
   blacksmith:{title:"Blacksmith",tabs:["Craft","Scrap","Enchant","Repair","Log"]},
-  research:{title:"Research",tabs:["Research","Log"]},
+  research:{title:"Research",tabs:["Research","Mastery","Skills","Log"]},
   gathering:{title:"Gathering Post",tabs:["Gather","Log"]},
   training:{title:"Training Grounds",tabs:["Mastery","Skills","Conditioning","Enhancements","Log"]},
   absorption:{title:"Absorption Chamber",tabs:["Rank Up","Class Upgrade","Absorb"]},
@@ -2278,8 +2278,8 @@ function renderTraining(tab,el){
     <button class="btn btn-o" style="width:100%" ${eligible.length?"":"disabled"} onclick="doImbueEnhancement('${s.id}')">Imbue</button></div>`).join("")}`;
   } else el.innerHTML=logTabHtml("training");
 }
-function beginMastery(heroId){const h=G.roster.find(x=>x.id===heroId);if(!h)return;if(startSession("training","mastery",heroId,h.wpn,{},masteryTrainTime(h),false))renderBldContent("training",0);}
-function beginSkillup(heroId,skill){const h=G.roster.find(x=>x.id===heroId);if(!h)return;const lv=h.skillLv[skill]||1;if(startSession("training","skillup",heroId,skill,{},skillTrainTime(lv,h.cls),false))renderBldContent("training",1);}
+function beginMastery(heroId){const h=G.roster.find(x=>x.id===heroId);if(!h)return;const bld=h.cls==="Mage"?"research":"training";if(startSession(bld,"mastery",heroId,h.wpn,{},masteryTrainTime(h),false))renderBldContent(bld,bld==="research"?1:0);}
+function beginSkillup(heroId,skill){const h=G.roster.find(x=>x.id===heroId);if(!h)return;const bld=h.cls==="Mage"?"research":"training";const lv=h.skillLv[skill]||1;if(startSession(bld,"skillup",heroId,skill,{},skillTrainTime(lv,h.cls),false))renderBldContent(bld,bld==="research"?2:1);}
 function beginConditioning(passId){const heroSel=document.getElementById("cond-hero-"+passId);if(startSession("training","conditioning",heroSel&&heroSel.value,passId,{},240000*trainTimeMult(),false))renderBldContent("training",2);}
 function beginSparring(){
   const h1=document.getElementById("spar-h1").value,h2=document.getElementById("spar-h2").value;
@@ -2775,7 +2775,7 @@ function tickSessionCountdownsUI(){
 }
 setInterval(tickSessionCountdownsUI,1000);
 function renderTraining(tab,el){
-  const heroes=sortedForTraining(G.roster.filter(trainEligible));
+  const heroes=sortedForTraining(G.roster.filter(h=>trainEligible(h)&&h.cls!=="Mage"));
   const readyCount=Object.values(G.sessions).filter(s=>s.bld==="training"&&s.ready).length;
   const finishBtn=`<button class="btn btn-o" style="width:100%;margin-bottom:10px" ${readyCount?"":"disabled"} onclick="collectFinishedTraining()">Finish Training${readyCount?` (${readyCount} ready)`:""}</button>`;
   const stars=h=>`<span style="font-size:8px;color:var(--gold);margin-left:4px">${"★".repeat(h.rarity+1)}</span>`;
@@ -2794,11 +2794,12 @@ function renderTraining(tab,el){
     }).join(""):'<div class="empty">No eligible heroes</div>'}
     ${sessionListHtml("training",["skillup"])}`;
   } else if(tab===2){
+    const heroesAll=sortedForTraining(G.roster.filter(trainEligible));
     el.innerHTML=finishBtn+`<div class="label">Conditioning (risk of injury)</div>
     ${TRAIN_PASS.map(p=>`<div class="box p12" style="margin-bottom:6px"><b style="font-size:11px">${p.name}</b><div style="font-size:9px;color:var(--text2);margin:3px 0">Injury risk ${Math.round(p.inj*100)}% · Death risk ${Math.round(p.die*100)}%</div>
-      <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><select id="cond-hero-${p.id}" style="font-size:10px;padding:4px;flex:1;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--bg);color:var(--text)">${heroSelectOptionsTraining(heroes)}</select><button class="btn btn-r" style="font-size:9px" ${bldFull("training")?"disabled":""} onclick="beginConditioning('${p.id}')">Train</button></div></div>`).join("")}
+      <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><select id="cond-hero-${p.id}" style="font-size:10px;padding:4px;flex:1;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--bg);color:var(--text)">${heroSelectOptionsTraining(heroesAll)}</select><button class="btn btn-r" style="font-size:9px" ${bldFull("training")?"disabled":""} onclick="beginConditioning('${p.id}')">Train</button></div></div>`).join("")}
     <div class="label" style="margin-top:10px">Sparring (builds bonds)</div>
-    <div class="box p12"><div style="display:flex;gap:5px;flex-wrap:wrap"><select id="spar-h1" style="font-size:10px;padding:4px;flex:1;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--bg);color:var(--text)">${heroSelectOptionsTraining(heroes)}</select><select id="spar-h2" style="font-size:10px;padding:4px;flex:1;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--bg);color:var(--text)">${heroSelectOptionsTraining(heroes)}</select><button class="btn btn-p" style="font-size:9px" ${bldFull("training")?"disabled":""} onclick="beginSparring()">Spar (5m)</button></div></div>
+    <div class="box p12"><div style="display:flex;gap:5px;flex-wrap:wrap"><select id="spar-h1" style="font-size:10px;padding:4px;flex:1;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--bg);color:var(--text)">${heroSelectOptionsTraining(heroesAll)}</select><select id="spar-h2" style="font-size:10px;padding:4px;flex:1;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--bg);color:var(--text)">${heroSelectOptionsTraining(heroesAll)}</select><button class="btn btn-p" style="font-size:9px" ${bldFull("training")?"disabled":""} onclick="beginSparring()">Spar (5m)</button></div></div>
     ${sessionListHtml("training",["conditioning","sparring"])}`;
   } else if(tab===3){
     const owned=ENHANCEMENT_TYPES.filter(s=>(G.inv[s.id]||0)>0);
@@ -3680,6 +3681,7 @@ function renderKitchen(tab,el){
 }
 function renderResearch(tab,el){
   const heroes=eligibleForBld();
+  const stars=h=>`<span style="font-size:8px;color:var(--gold);margin-left:4px">${"★".repeat(h.rarity+1)}</span>`;
   if(tab===0){
     el.innerHTML=`<div class="label">Research</div>`+RESEARCH_RECIPES.map(r=>{
       const done=G.completedResearch.includes(r.id);
@@ -3689,6 +3691,22 @@ function renderResearch(tab,el){
       return`<div class="box p12" style="margin-bottom:8px${done?";border-color:var(--green)":""}"><b style="font-size:11px">${r.name}</b>${done?' <span class="sbadge" style="background:var(--green-bg);color:var(--green-tx);border-color:var(--green-br)">Complete</span>':""}<div style="font-size:9px;color:var(--text2);margin:3px 0">${r.desc}</div>
       ${!done?`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">${costChips(r.cost)}</div><div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"><select id="res-hero-${r.id}" style="font-size:10px;padding:4px;flex:1;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--bg);color:var(--text)">${heroSelectOptions(heroes)}</select><button class="btn btn-p" ${can?"":"disabled"} onclick="beginResearch('${r.id}')">Research (${formatDuration(dur)})</button><button class="btn btn-p" ${canFast?"":"disabled"} onclick="beginResearchFast('${r.id}')">⚡ Fast Track</button></div>`:""}</div>`;
     }).join("")+sessionListHtml("research",["research"]);
+  } else if(tab===1){
+    const mages=sortedForTraining(G.roster.filter(h=>trainEligible(h)&&h.cls==="Mage"));
+    el.innerHTML=`<div class="label">Mage weapon mastery</div><div style="font-size:9px;color:var(--text2);margin-bottom:8px">Raises a Mage's elemental mastery level, granting a small combat stat bonus. Mage training happens here now, not at Training Grounds.</div>
+    ${mages.length?mages.map(h=>{const cur=(h.wm&&h.wm[h.wpn])||1;const maxed=cur>=20;const dur=masteryTrainTime(h);
+      return`<div class="box p12" style="display:flex;align-items:center;gap:8px;margin-bottom:6px">${weaponIconSm(h)}<span style="flex:1;font-size:11px">${h.name}${stars(h)} — ${h.wpn} Lv.${cur}/20</span><button class="btn btn-p" style="font-size:9px" ${maxed||bldFull("research")?"disabled":""} onclick="beginMastery('${h.id}')">${maxed?"Maxed":"Train ("+formatDuration(dur)+")"}</button></div>`;
+    }).join(""):'<div class="empty">No eligible Mages</div>'}
+    ${sessionListHtml("research",["mastery"])}`;
+  } else if(tab===2){
+    const mages=sortedForTraining(G.roster.filter(h=>trainEligible(h)&&h.cls==="Mage"));
+    const withSkills=mages.filter(h=>h.skills.some(s=>!PASSIVE.has(s)));
+    el.innerHTML=`<div class="label">Mage ability training</div><div style="font-size:9px;color:var(--text2);margin-bottom:8px">Levels an active spell toward Lv.10, with a chance to evolve once maxed.</div>
+    ${withSkills.length?withSkills.map(h=>{
+      const activeS=h.skills.filter(s=>!PASSIVE.has(s));
+      return`<div class="box p12" style="margin-bottom:8px"><b style="font-size:11px">${h.name}</b>${stars(h)} <span style="font-size:9px;color:var(--text2)">(${h.wpn} Mastery Lv${(h.wm&&h.wm[h.wpn])||1})</span><div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px">${activeS.map(s=>{const lv=h.skillLv[s]||1;const dur=skillTrainTime(lv,h.cls);return`<button class="btn" style="font-size:9px" ${bldFull("research")?"disabled":""} onclick="beginSkillup('${h.id}','${s}')">${s} Lv.${lv}${h.skillEvolved[s]?" ✦":""} (${formatDuration(dur)})</button>`;}).join("")}</div></div>`;
+    }).join(""):'<div class="empty">No eligible Mages</div>'}
+    ${sessionListHtml("research",["skillup"])}`;
   } else el.innerHTML=logTabHtml("research");
 }
 function renderGathering(tab,el){
