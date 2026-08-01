@@ -409,21 +409,13 @@ body{font-family:var(--font);color:var(--text);font-size:13px;
     <label style="font-size:11px;display:flex;align-items:center;gap:6px;margin-bottom:8px"><input type="checkbox" id="set-audio" onchange="G.settings.audioEnabled=this.checked"> Combat sound effects</label>
     <div style="font-size:11px;display:flex;align-items:center;gap:8px">Default combat speed <select id="set-speed" onchange="G.settings.defaultSpeed=+this.value" style="font-size:10px;padding:4px;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--bg);color:var(--text)"><option value="0.5">0.5×</option><option value="1">1×</option><option value="2">2×</option></select></div>
   </div>
-  <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Save your progress to one of three slots, or load an earlier save. Saves live in this browser only — export a slot to keep your progress safe across future versions of this file.</div>
+  <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Your progress saves automatically as you play — nothing to manage. Export a backup below if you want a copy you can keep, or restore an older one.</div>
   <div class="box p12" style="margin-bottom:12px;border-color:var(--gold)">
-    <div class="label">Export / Import</div>
-    <div style="font-size:9px;color:var(--text2);margin-bottom:8px">Export downloads a save as a .json file you can keep. Import loads a previously exported file into a slot — useful when moving to a newer version of this game.</div>
+    <div class="label">Backup / Restore</div>
+    <div style="font-size:9px;color:var(--text2);margin-bottom:8px">Export downloads your current progress as a .json file. Import replaces your current progress with a previously exported file.</div>
     <button class="btn btn-o" style="margin-bottom:8px" onclick="exportCurrent()">Export current progress</button>
-    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-      <select id="import-slot" style="font-size:10px;padding:5px;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--bg);color:var(--text)">
-        <option value="1">Import into Slot 1</option>
-        <option value="2">Import into Slot 2</option>
-        <option value="3">Import into Slot 3</option>
-      </select>
-      <label class="btn btn-p" style="cursor:pointer">Choose file<input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImportFile(event)"></label>
-    </div>
+    <label class="btn btn-p" style="cursor:pointer;display:inline-block">Import a backup<input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImportFile(event)"></label>
   </div>
-  <div id="save-slots"></div>
 </div>
 
 <div id="view-building" class="view" style="flex-direction:row">
@@ -949,7 +941,6 @@ function applyNav(){
   if(cur==="settings"){
     document.getElementById("set-autodismiss").checked=G.settings.autoDismissClear;
     document.getElementById("set-speed").value=String(G.settings.defaultSpeed);
-    renderSaveScreen();
   }
 }
 function toggleCol(id,reopenId){
@@ -2408,11 +2399,16 @@ function exportCurrent(){
 }
 function handleImportFile(evt){
   const file=evt.target.files[0];if(!file)return;
-  const slot=+document.getElementById("import-slot").value;
   const reader=new FileReader();
   reader.onload=e=>{
-    try{JSON.parse(e.target.result);localStorage.setItem(SAVE_PREFIX+slot,e.target.result);showToast("Imported into Slot "+slot,"success");renderSaveScreen();}
-    catch(err){showToast("Invalid save file","fail");}
+    try{
+      JSON.parse(e.target.result); // validate it's real JSON before committing
+      if(!confirm("Import this save? Your current progress will be replaced."))return;
+      localStorage.setItem(AUTO_SAVE_KEY,e.target.result);
+      deserializeState(e.target.result);
+      updateNav();applyNav();
+      showToast("Save imported","success");
+    }catch(err){showToast("Invalid save file","fail");}
   };
   reader.readAsText(file);evt.target.value="";
 }
