@@ -5320,6 +5320,203 @@ function topGrudge(hero){
 }
 </script>
 <script>
+/* ============================================================
+   Pass 41 — real spatial floor map (Bit Heroes-style traversal)
+   Replaces the small icon-strip + choice-popup with an actual
+   branching map your hero visibly walks across.
+   ============================================================ */
+
+/* ---------- 1. Node color palette, matching the reference's visual language ---------- */
+const MAP_NODE_COLOR={
+  combat:{fill:"#f1efe8",stroke:"#5f5e5a",text:"#44443f"},
+  elite:{fill:"#f3e6f2",stroke:"#7a3f6e",text:"#5a2d51"},
+  treasure:{fill:"#faeeda",stroke:"#854f0b",text:"#633806"},
+  rest:{fill:"#e1f5ee",stroke:"#0f6e56",text:"#085041"},
+  boss:{fill:"#faece7",stroke:"#993c1d",text:"#712b13"},
+  choice:{fill:"#f1efe8",stroke:"#5f5e5a",text:"#44443f"},
+};
+
+/* ---------- 2. Procedural layout: turns the linear slot array into 2D room positions, forking at choice nodes and reconverging ---------- */
+function computeMapLayout(floorMap){
+  const slots=floorMap.slots;
+  const n=slots.length;
+  const rowH=Math.max(88,Math.min(120,620/Math.max(1,n-1)));
+  const positions=[];
+  let y=60;
+  for(let i=0;i<n;i++){
+    const slot=slots[i];
+    if(slot.type==="choice"&&!slot.resolved){
+      positions.push({fork:true,a:{x:150,y},b:{x:390,y}});
+    } else {
+      positions.push({x:270,y});
+    }
+    y+=rowH;
+  }
+  return positions;
+}
+
+/* ---------- 3. Room + connector SVG rendering ---------- */
+function roomSvg(x,y,type,label,sub,extra,current,done,dim){
+  const c=MAP_NODE_COLOR[type]||MAP_NODE_COLOR.combat;
+  const w=type==="boss"?150:112,h=type==="boss"?92:72;
+  const opacity=dim?0.35:1;
+  const ring=current?`<rect x="${x-w/2-7}" y="${y-h/2-7}" width="${w+14}" height="${h+14}" rx="14" fill="none" stroke="var(--hgold)" stroke-width="2.5" opacity="0.85"><animate attributeName="opacity" values="0.85;0.3;0.85" dur="1.6s" repeatCount="indefinite"/></rect>`:"";
+  const check=done?`<text x="${x+w/2-16}" y="${y-h/2+18}" text-anchor="middle" font-size="14" fill="var(--green)">✓</text>`:"";
+  return`<g opacity="${opacity}" style="${extra||""}">
+    ${ring}
+    <rect x="${x-w/2}" y="${y-h/2}" width="${w}" height="${h}" rx="9" fill="${c.fill}" stroke="${c.stroke}" stroke-width="1.6"/>
+    <text x="${x}" y="${y-6}" text-anchor="middle" font-size="12" font-weight="600" fill="${c.text}">${label}</text>
+    <text x="${x}" y="${y+11}" text-anchor="middle" font-size="9.5" fill="${c.stroke}">${sub}</text>
+    ${check}
+  </g>`;
+}
+function fogRoomSvg(x,y){
+  return`<g opacity="0.5">
+    <rect x="${x-56}" y="${y-36}" width="112" height="72" rx="9" fill="#2a2e33" stroke="#44484d" stroke-width="1.6" stroke-dasharray="5,4"/>
+    <text x="${x}" y="${y+5}" text-anchor="middle" font-size="16" fill="#6a6e73">?</text>
+  </g>`;
+}
+function connectorSvg(x1,y1,x2,y2){
+  const ymid=(y1+y2)/2;
+  return`<path d="M${x1},${y1} L${x1},${ymid} L${x2},${ymid} L${x2},${y2}" fill="none" stroke="#888780" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+
+/* ---------- 4. Main renderer — replaces the old small icon strip entirely, same function name so existing call sites (startRun/runWave) need no changes ---------- */
+function renderFloorMapStrip(){
+  const bf=document.getElementById("battlefield");
+  if(!G.floorMap||!G.combatActive){ const old=document.getElementById("floor-map-spatial"); if(old) old.remove(); return; }
+  let el=document.getElementById("floor-map-spatial");
+  if(!el){
+    el=document.createElement("div");
+    el.id="floor-map-spatial";
+    el.style.cssText="background:var(--bg2);border-bottom:2px solid var(--border);flex-shrink:0;max-height:38%;overflow-y:auto;padding:6px";
+    const anchorRow=document.getElementById("d-prog");
+    const mountPoint=anchorRow&&anchorRow.parentNode?anchorRow.parentNode.parentNode:null;
+    if(mountPoint&&mountPoint.insertBefore&&anchorRow.parentNode){ mountPoint.insertBefore(el, anchorRow.parentNode); }
+    else if(bf&&bf.parentNode){ bf.parentNode.insertBefore(el, bf); }
+  }
+  const layout=computeMapLayout(G.floorMap);
+  const currentIdx=Math.max(0,G.waveNum-1);
+  const totalH=layout[layout.length-1].fork?layout[layout.length-1].a.y+60:layout[layout.length-1].y+60;
+  let svg=`<svg viewBox="0 0 540 ${totalH}" width="100%" style="display:block;max-width:420px;margin:0 auto">`;
+  const revealed=(i)=>i<=currentIdx+1; // visited + current + one step ahead; everything further is fog
+  // connectors first (so rooms draw on top); connectors leading into fog still draw, so the path is visible even if the room isn't
+  for(let i=0;i<layout.length-1;i++){
+    const cur=layout[i],next=layout[i+1];
+    const fromPts=cur.fork?[cur.a,cur.b]:[cur];
+    const toPts=next.fork?[next.a,next.b]:[next];
+    fromPts.forEach(fp=>toPts.forEach(tp=>{ svg+=connectorSvg(fp.x,fp.y,tp.x,tp.y); }));
+  }
+  // rooms
+  layout.forEach((pos,i)=>{
+    const slot=G.floorMap.slots[i];
+    const isCurrent=i===currentIdx;
+    const isDone=i<currentIdx;
+    if(!revealed(i)){
+      if(pos.fork){ svg+=fogRoomSvg(pos.a.x,pos.a.y); svg+=fogRoomSvg(pos.b.x,pos.b.y); }
+      else { svg+=fogRoomSvg(pos.x,pos.y); }
+      return;
+    }
+    if(pos.fork){
+      const objA=slot.objectiveOption===0,objB=slot.objectiveOption===1;
+      svg+=roomSvg(pos.a.x,pos.a.y,slot.options[0],NODE_TYPE_LABEL[slot.options[0]],objA?"★ objective":NODE_TYPE_DESC[slot.options[0]].split(" ").slice(0,2).join(" "),`cursor:pointer` ,isCurrent,false,false);
+      svg+=roomSvg(pos.b.x,pos.b.y,slot.options[1],NODE_TYPE_LABEL[slot.options[1]],objB?"★ objective":NODE_TYPE_DESC[slot.options[1]].split(" ").slice(0,2).join(" "),`cursor:pointer`,isCurrent,false,false);
+    } else {
+      const type=slot.resolved||slot.type;
+      const label=type==="boss"?"Boss":type==="choice"?NODE_TYPE_LABEL[slot.resolved]||"?":NODE_TYPE_LABEL[type]||"Combat";
+      const sub=type==="boss"?"Floor boss":isDone?"Cleared":isCurrent?"You are here":"Ahead";
+      svg+=roomSvg(pos.x,pos.y,type==="choice"?(slot.resolved||"combat"):type,label,sub,"",isCurrent,isDone,false);
+    }
+  });
+  svg+=`</svg>`;
+  el.style.position="relative";
+  let svgContainer=document.getElementById("floor-map-svg-container");
+  if(!svgContainer){
+    svgContainer=document.createElement("div");
+    svgContainer.id="floor-map-svg-container";
+    svgContainer.style.cssText="max-width:420px;margin:0 auto;position:relative";
+    el.appendChild(svgContainer);
+  }
+  svgContainer.innerHTML=svg;
+  // hero marker: a true sibling of svgContainer (both direct children of el) — matches its exact box via
+  // identical max-width/centering, but is never nested inside it, so the innerHTML redraw above can never
+  // touch it. This is what actually lets it persist and animate instead of being destroyed every render.
+  let markerLayer=document.getElementById("map-hero-marker-layer");
+  if(!markerLayer){
+    markerLayer=document.createElement("div");
+    markerLayer.id="map-hero-marker-layer";
+    markerLayer.style.cssText="position:absolute;inset:0;max-width:420px;margin:0 auto;pointer-events:none";
+    el.appendChild(markerLayer);
+    const dot=document.createElement("div");
+    dot.id="map-hero-marker";
+    dot.style.cssText="position:absolute;width:14px;height:14px;border-radius:50%;background:var(--hgold);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5);transform:translate(-50%,-50%);z-index:5;transition:left 0.7s cubic-bezier(.3,0,.4,1),top 0.7s cubic-bezier(.3,0,.4,1)";
+    markerLayer.appendChild(dot);
+  }
+  const dot=document.getElementById("map-hero-marker");
+  if(dot){
+    const curPos=layout[currentIdx];
+    const px=curPos.fork?curPos.a.x:curPos.x, py=curPos.fork?curPos.a.y:curPos.y;
+    void dot.offsetHeight; // force a reflow so the browser registers the current position as the transition's starting point before the new value is applied
+    dot.style.left=(px/540*100)+"%";
+    dot.style.top=(py/totalH*100)+"%";
+    // zoom the whole map in on the current room once an actual fight is happening there, so the room you're
+    // in becomes the focus instead of the whole floor — resets to a normal full view outside of combat
+    const inCombat=G.curEnemies&&G.curEnemies.some(e=>e.hp>0);
+    const originPct=(px/540*100)+"% "+(py/totalH*100)+"%";
+    [svgContainer,markerLayer].forEach(elx=>{
+      elx.style.transformOrigin=originPct;
+      elx.style.transition="transform 0.5s ease";
+      elx.style.transform=inCombat?"scale(2.2)":"scale(1)";
+    });
+  }
+  const waveLabel=document.getElementById("d-wave");
+  if(waveLabel){
+    const curSlot=G.floorMap.slots[currentIdx];
+    const roomType=curSlot.resolved||curSlot.type;
+    const roomName=roomType==="boss"?"Boss Chamber":roomType==="choice"?"The Path Splits":(NODE_TYPE_LABEL[roomType]||"Room")+" Room";
+    waveLabel.textContent=`Room ${currentIdx+1}/${G.floorMap.totalNodes} — ${roomName}`;
+  }
+  // wire up tap-to-choose on the current fork, if any
+  const curSlot=G.floorMap.slots[currentIdx];
+  if(curSlot&&curSlot.type==="choice"&&!curSlot.resolved&&G._pendingNodeChoice){
+    const gs=el.querySelectorAll("svg > g");
+    if(gs[0])gs[0].addEventListener("click",()=>{ G._pendingNodeChoice(0); });
+    if(gs[1])gs[1].addEventListener("click",()=>{ G._pendingNodeChoice(1); });
+  }
+}
+
+/* ---------- 5. Choice resolution now happens by tapping the map directly instead of a popup — same function signature, so every existing call site keeps working unchanged ---------- */
+function showNodeChoicePrompt(slotIdx,onDone){
+  const slot=G.floorMap.slots[slotIdx];
+  const floor=G.floorMap.floor;
+  const splitOk=isSplitSquadEligible(floor);
+  G.combatPaused=true;
+  G._pendingNodeChoice=(optionIdx)=>{
+    slot.resolved=slot.options[optionIdx];
+    G._pendingNodeChoice=null;
+    G.combatPaused=false;
+    const banner=document.getElementById("map-split-banner"); if(banner) banner.remove();
+    onDone(slot.resolved);
+  };
+  renderFloorMapStrip();
+  if(splitOk){
+    const el=document.getElementById("floor-map-spatial");
+    if(el&&!document.getElementById("map-split-banner")){
+      const banner=document.createElement("div");
+      banner.id="map-split-banner";
+      banner.style.cssText="text-align:center;margin-top:6px";
+      banner.innerHTML=`<button class="btn ghost" style="font-size:10px;border-color:var(--purple)" id="node-split-btn">⚔ Split the Squad — send two parties, one down each path</button>`;
+      el.appendChild(banner);
+      banner.querySelector("#node-split-btn").addEventListener("click",()=>{
+        G._pendingNodeChoice=null;
+        banner.remove();
+        showSplitSquadPartyPicker(slotIdx,onDone);
+      });
+    }
+  }
+}
+</script>
+<script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("sw.js").catch(() => {});
