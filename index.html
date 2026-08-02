@@ -43,11 +43,11 @@ body{font-family:var(--font);color:var(--text);font-size:13px;
   border:4px solid var(--hgold-deep);border-radius:16px;overflow:hidden;background:var(--bg);
   box-shadow:0 0 0 2px var(--hgold) inset, 0 14px 40px rgba(0,0,0,.55);
 }
-.topbar{display:flex;align-items:center;gap:8px;padding:9px 12px;flex-shrink:0;
+.topbar{display:flex;align-items:center;gap:8px;padding:13px 12px;flex-shrink:0;
   background:linear-gradient(180deg,var(--wood-hi) 0%,var(--wood-mid) 55%,var(--wood-dark) 100%);
   border-bottom:3px solid var(--hgold-deep);box-shadow:0 2px 0 var(--hgold) inset;
 }
-.topbar-back{font-size:11px;padding:5px 11px;border-radius:99px;cursor:pointer;color:var(--cream);font-weight:700;
+.topbar-back{font-size:13px;padding:9px 16px;border-radius:99px;cursor:pointer;color:var(--cream);font-weight:700;
   background:linear-gradient(180deg,var(--gem-sa) 0%,var(--gem-sa-deep) 100%);
   border:1.5px solid #1D3E63;box-shadow:0 2px 0 #1D3E63,0 1px 0 rgba(255,255,255,.35) inset;
 }
@@ -206,11 +206,11 @@ body{font-family:var(--font);color:var(--text);font-size:13px;
 .sprite-boss{width:60px;height:60px;font-size:20px}
 .sprite-tracker-badge{position:absolute;top:-6px;right:-4px;font-size:10px;color:var(--hgold-hi)}
 @keyframes sprite-hit{0%,100%{filter:brightness(1)}40%{filter:brightness(2.2) saturate(0)}}
-.sprite-hpbar-track{width:44px;height:4px;background:rgba(0,0,0,.5);border-radius:2px;overflow:hidden;margin-bottom:2px;border:1px solid rgba(255,255,255,.3)}
+.sprite-hpbar-track{width:58px;height:7px;background:rgba(0,0,0,.5);border-radius:3px;overflow:hidden;margin-bottom:2px;border:1px solid rgba(255,255,255,.3)}
 .sprite-hpbar-fill{height:100%;border-radius:2px;transition:width .25s}
 .sprite-status-mini{display:flex;gap:2px;justify-content:center;flex-wrap:wrap;max-width:52px;min-height:8px;margin-bottom:2px}
 .sprite-hpbar-track{position:relative}
-.sprite-hp-num{position:absolute;right:2px;top:-1px;font-size:6px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.8);line-height:1}
+.sprite-hp-num{position:absolute;right:3px;top:-2px;font-size:8px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.8);line-height:1}
 .skill-tray{display:flex;gap:3px;justify-content:center;margin-top:3px}
 .skill-icon{width:13px;height:13px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;line-height:1;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.35);color:rgba(255,255,255,.9);transition:opacity .15s,transform .15s}
 .skill-icon.ready{border-color:var(--purple);box-shadow:0 0 4px 1px rgba(155,109,255,.4)}
@@ -1717,6 +1717,8 @@ function runWave(floor,mission){
   renderBattlefield();renderHUD();
   runRound(enemies,floor,mission);}
 function pickSmartTarget(list){
+  const unaware=list.find(e=>e.alerted===false&&e.hp>0);
+  if(unaware) return unaware; // a free hit is always worth taking over normal target priority
   if(Math.random()<0.65 && list.length>1){
     return [...list].sort((a,b)=>(a.hp/a.maxHp)-(b.hp/b.maxHp))[0];
   }
@@ -1730,7 +1732,8 @@ function chooseHeroAction(hero,ae){
   let mistakeChance=baseMistake*Math.max(0.3,1-hero.lv/150);
   if(typeof moraleTierIndex==="function" && moraleTierIndex(hero)===4) mistakeChance=Math.min(0.9,mistakeChance+0.15); // Resentful heroes fight like they mean it less
   const flubbed=Math.random()<mistakeChance;
-  const lowestHpEnemy=[...ae].sort((a,b)=>(a.hp/a.maxHp)-(b.hp/b.maxHp))[0];
+  const unawareTarget=ae.find(e=>e.alerted===false&&e.hp>0);
+  const lowestHpEnemy=unawareTarget||[...ae].sort((a,b)=>(a.hp/a.maxHp)-(b.hp/b.maxHp))[0];
   const tankiestEnemy=[...ae].sort((a,b)=>b.maxHp-a.maxHp)[0];
 
   if(flubbed||!activeS.length){
@@ -1778,6 +1781,7 @@ function runRound(enemies,floor,mission){
   ah=G.cHeroes.filter(h=>h.isAlive&&h.hp>0&&!isHoldingObjective(h.id)&&!h.isReserve&&!h._justSwapped);
   tickStatuses(ae,true,floor,ah,structChange);
   ae=enemies.filter(e=>e.hp>0);
+  const actingEnemies=ae.filter(e=>e.alerted!==false);
   if(!ah.length){
     if(G.objectiveHolders&&G.objectiveHolders.some(o=>o.status==="holding")){
       const anyoneAlive=G.cHeroes.some(h=>h.isAlive&&h.hp>0);
@@ -1863,7 +1867,10 @@ function runRound(enemies,floor,mission){
       if(enemy.hp<=0){onEnemyDefeated(enemy,ah,floor);structuralChange=true;}
     }
   } else if(r<.66){
-    const enemy=pick(ae);
+    if(!actingEnemies.length){
+      renderHUD();setTimeout(()=>runRound(enemies,floor,mission),getDelay());return;
+    }
+    const enemy=pick(actingEnemies);
     const enemyControl=isControlled(enemy);
     if(enemyControl){
       addLog("combat","🥶",`<b>${edn(enemy)}</b> is ${STATUS_DEFS[enemyControl].label.toLowerCase()} and can't act`);
@@ -4217,13 +4224,7 @@ function ensureCombatMetersUI(){
   el.id="bf-combat-meters";
   el.style.cssText="position:absolute;top:8px;left:8px;z-index:8;display:flex;flex-direction:column;gap:5px;pointer-events:none";
   el.innerHTML=`
-    <div id="bf-combo" style="font-weight:800;color:#fff;text-shadow:0 2px 4px rgba(0,0,0,.7);opacity:0;transition:opacity .2s,font-size .15s"></div>
-    <div style="width:110px">
-      <div style="font-size:8px;color:rgba(255,255,255,.75);margin-bottom:2px;text-transform:uppercase;letter-spacing:.06em">Ultimate</div>
-      <div style="height:6px;background:rgba(0,0,0,.4);border-radius:3px;overflow:hidden;border:1px solid rgba(255,255,255,.25)">
-        <div id="bf-ultimate-fill" style="height:100%;width:0%;background:linear-gradient(90deg,var(--purple),var(--hgold));transition:width .3s"></div>
-      </div>
-    </div>`;
+    <div id="bf-combo" style="font-weight:800;color:#fff;text-shadow:0 2px 4px rgba(0,0,0,.7);opacity:0;transition:opacity .2s,font-size .15s"></div>`;
   bf.appendChild(el);
 }
 function resetCombatMeters(){
@@ -5212,6 +5213,33 @@ execPull=function(){
   autoSaveNow();
   return h;
 };
+</script>
+<script>
+/* ============================================================
+   Pass 39 — rotate-device prompt (honest alternative to force-lock,
+   since screen.orientation.lock() doesn't work on iOS Safari at all)
+   ============================================================ */
+(function injectRotatePrompt(){
+  const css=`
+  #rotate-overlay{position:fixed;inset:0;z-index:9999;background:#1a2129;display:none;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:24px}
+  #rotate-overlay.show{display:flex}
+  #rotate-overlay svg{margin-bottom:16px;animation:rotate-hint 1.8s ease-in-out infinite}
+  #rotate-overlay .msg{color:#F5D9A8;font-size:14px;font-weight:700;max-width:260px}
+  @keyframes rotate-hint{0%,100%{transform:rotate(0deg)}50%{transform:rotate(90deg)}}
+  `;
+  const style=document.createElement("style"); style.textContent=css; document.head.appendChild(style);
+  const el=document.createElement("div");
+  el.id="rotate-overlay";
+  el.innerHTML=`<svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#BA7517" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M12 18h.01"/></svg><div class="msg">Turn your device sideways for the best view</div>`;
+  document.body.appendChild(el);
+  function checkOrientation(){
+    const isPortrait=window.matchMedia("(orientation: portrait)").matches;
+    el.classList.toggle("show", isPortrait && window.innerWidth<900);
+  }
+  window.addEventListener("resize",checkOrientation);
+  window.addEventListener("orientationchange",checkOrientation);
+  checkOrientation();
+})();
 </script>
 <script>
 if ("serviceWorker" in navigator) {
