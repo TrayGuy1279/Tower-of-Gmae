@@ -1178,7 +1178,8 @@ function selHero(id){G.selHero=id;renderRoster();const h=G.roster.find(x=>x.id==
       <div class="av-lg" style="background:${c.bg};color:${c.tx}">${initials(h.name)}</div>
       <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">${h.name}</div><div style="font-size:10px;color:var(--gold);font-weight:700">${"★".repeat(h.rarity+1)}</div>
       <div style="font-size:10px;color:var(--text2)">${h.cls} · ${h.wpn} · Lv.${h.lv} (${h.xp}/${h.lv*60+120} XP)${h.hybridClass?` <span class="sbadge">${h.hybridClass}</span>`:h.prodClass?` <span class="sbadge">${h.prodClass}</span>`:""}</div>
-      <div style="font-size:9px;margin-top:2px"><span class="m-${h.mentality||"neutral"}">${mLabel}</span>${h.isInjured?`<span style="font-size:9px;color:var(--red-tx);margin-left:5px">Injured until floor ${h.injFloor}</span>`:""}${heroOccupied(h.id)?`<span style="font-size:9px;color:var(--purple-tx);margin-left:5px">Currently occupied</span>`:""}</div></div>
+      <div style="font-size:9px;margin-top:2px"><span class="m-${h.mentality||"neutral"}">${mLabel}</span>${h.isInjured?`<span style="font-size:9px;color:var(--red-tx);margin-left:5px">Injured until floor ${h.injFloor}</span>`:""}${heroOccupied(h.id)?`<span style="font-size:9px;color:var(--purple-tx);margin-left:5px">Currently occupied</span>`:""}</div>
+      ${(()=>{const g=topGrudge(h);return g?`<div style="font-size:9px;margin-top:2px;color:var(--red-tx);font-weight:700">${g.tier} vs ${g.enemyName} <span style="font-weight:400;color:var(--text2)">(${g.count} encounters)</span></div>`:"";})()}</div>
       <div style="flex-shrink:0;align-self:flex-start">
         ${!ip&&G.party.length<5&&!h.isInjured&&!craftOccupied(h.id)?`<button class="btn btn-g" onclick="addParty('${h.id}')">+ Party</button>`:""}
         ${ip?`<button class="btn btn-r" onclick="removeParty('${h.id}')">Remove</button>`:""}
@@ -1811,14 +1812,17 @@ function runRound(enemies,floor,mission){
       if(!hero.enemyFamiliarity)hero.enemyFamiliarity={};
       const famCount=hero.enemyFamiliarity[enemy.name]||0;
       const famCritBonus=Math.min(15,famCount*0.5);
-      const isCrit=Math.random()*100<Math.max(0,hero.crit+famCritBonus-(slowed?STATUS_DEFS.slow.critPenalty:0));
       hero.enemyFamiliarity[enemy.name]=famCount+1;
+      const grudge=grudgeTier(famCount+1);
+      const isCrit=(grudge&&grudge.guaranteedCrit)||Math.random()*100<Math.max(0,hero.crit+famCritBonus-(slowed?STATUS_DEFS.slow.critPenalty:0));
       const fx=useSkill?getSkillEffect(skill):{type:"strike",mult:1};
       const staCost=fx.staminaCost||20;
       const pw=classPowerStat(hero);
       const base=floor<=3?rand(pw*.7,pw*1.5):rand(pw*.55,pw*1.35);
       let mult=useSkill?fx.mult:1;
       if(useSkill){ const skLv=(hero.skillLv&&hero.skillLv[skill])||1; mult*=1+(skLv-1)*0.04; }
+      if(grudge)mult*=1+grudge.dmgBonus;
+      if(useSkill)trackSkillUsage(hero,skill);
       const lowHpBonus=(hero.passiveFx&&hero.passiveFx.lowHpDmgBonus)||0;
       if(lowHpBonus&&hero.hp/hero.maxHp<.5)mult+=lowHpBonus;
       if(useSkill&&hero.skillEvolved&&hero.skillEvolved[skill])mult*=1.25;
@@ -2900,9 +2904,9 @@ function completeSession(sid){
       addTrainLog("•",h.name,`trained ${h.wpn} mastery to Lv.${h.wm[h.wpn]}`,{bld:"training"});
       break;}
     case"skillup":{
-      const cur=h.skillLv[s.itemId]||1;
-      if(cur<10){h.skillLv[s.itemId]=cur+1;addTrainLog("•",h.name,`trained <b>${s.itemId}</b> to Lv.${cur+1}`,{bld:"training"});}
-      else if(!h.skillEvolved[s.itemId]&&Math.random()<.25){h.skillEvolved[s.itemId]=true;addTrainLog("•",h.name,`<b>${s.itemId}</b> evolved into a stronger form!`,{bld:"training"});showToast(`${s.itemId} evolved!`,"success");}
+      const result=levelUpSkill(h,s.itemId);
+      if(result.leveled)addTrainLog("•",h.name,`trained <b>${s.itemId}</b> to Lv.${result.newLevel}`,{bld:"training"});
+      else if(result.evolved){addTrainLog("•",h.name,`<b>${s.itemId}</b> evolved into a stronger form!`,{bld:"training"});showToast(`${s.itemId} evolved!`,"success");}
       else addTrainLog("•",h.name,`trained <b>${s.itemId}</b> further (already max)`,{bld:"training"});
       break;}
     case"conditioning":{
@@ -5240,6 +5244,65 @@ execPull=function(){
   window.addEventListener("orientationchange",checkOrientation);
   checkOrientation();
 })();
+</script>
+<script>
+/* ============================================================
+   Pass 40 — combat-based skill leveling + Grudge system
+   ============================================================ */
+
+/* ---------- 1. Shared level-up logic, used by both combat usage AND building training ---------- */
+function levelUpSkill(hero,skill){
+  if(!hero.skillLv)hero.skillLv={};
+  if(!hero.skillEvolved)hero.skillEvolved={};
+  const cur=hero.skillLv[skill]||1;
+  if(cur<10){
+    hero.skillLv[skill]=cur+1;
+    return {leveled:true,newLevel:cur+1};
+  }
+  if(!hero.skillEvolved[skill]&&Math.random()<.25){
+    hero.skillEvolved[skill]=true;
+    return {evolved:true};
+  }
+  return {maxed:true};
+}
+
+/* ---------- 2. Combat-based skill usage tracking ---------- */
+function skillUsesNeeded(level){ return level*8; }
+function trackSkillUsage(hero,skill){
+  if(!hero.skillUses)hero.skillUses={};
+  const needed=skillUsesNeeded(hero.skillLv[skill]||1);
+  const cur=(hero.skillUses[skill]||0)+1;
+  if(cur>=needed){
+    hero.skillUses[skill]=0;
+    const result=levelUpSkill(hero,skill);
+    if(result.leveled){
+      addLog("combat","📈",`<b>${hero.name}</b> has grown sharper with <b>${skill}</b> through battle — now Lv.${result.newLevel}`);
+    } else if(result.evolved){
+      addLog("combat","✦",`<b>${hero.name}</b>'s <b>${skill}</b> evolved into a stronger form through hard-won experience!`);
+      showToast(`${skill} evolved!`,"success");
+    }
+  } else {
+    hero.skillUses[skill]=cur;
+  }
+}
+
+/* ---------- 3. Grudge tiers — escalating combat bonus vs a specific enemy name, built from the existing familiarity count ---------- */
+function grudgeTier(hitCount){
+  if(hitCount>=50) return{name:"Nemesis",dmgBonus:0.20,guaranteedCrit:true};
+  if(hitCount>=30) return{name:"Grudge",dmgBonus:0.12,guaranteedCrit:false};
+  if(hitCount>=15) return{name:"Rival",dmgBonus:0.06,guaranteedCrit:false};
+  if(hitCount>=5) return{name:"Familiar",dmgBonus:0,guaranteedCrit:false};
+  return null;
+}
+function topGrudge(hero){
+  if(!hero.enemyFamiliarity) return null;
+  let best=null,bestCount=0;
+  Object.entries(hero.enemyFamiliarity).forEach(([name,count])=>{
+    const tier=grudgeTier(count);
+    if(tier && count>bestCount){ best={enemyName:name,tier:tier.name,count}; bestCount=count; }
+  });
+  return best;
+}
 </script>
 <script>
 if ("serviceWorker" in navigator) {
