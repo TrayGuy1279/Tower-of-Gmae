@@ -1793,9 +1793,8 @@ function runRound(enemies,floor,mission){
   }
   if(!ae.length){
     ah.forEach(h=>{const slowed=(h.sfx||[]).some(s=>s.type==="slow");let regen=Math.max(0,rand(10,20)+((h.passiveFx&&h.passiveFx.staminaRegenBonus)||0)-(slowed?STATUS_DEFS.slow.staminaRegenPenalty:0));if(G.activeMeal==="stamina_broth")regen+=10;h.sta=Math.min(h.maxSta,h.sta+regen);});
-    addLog("flavor","💭",pick(IDLE)(pick(ah).name));
     renderHUD();if(structChange.val)renderBattlefield();
-    setTimeout(()=>runWave(floor,mission),1800/G.combatSpd);return;
+    beginTravelPause(floor,mission);return;
   }
   const delay=getDelay();const r=Math.random();
   let structuralChange=structChange.val;
@@ -4666,7 +4665,7 @@ runWave=function(floor,mission){
     showToast("Treasure found!","success");
     document.getElementById("d-wave").textContent="Wave "+G.waveNum+"/"+G.totalWaves;
     document.getElementById("d-prog").style.width=Math.round((G.waveNum-1)/G.totalWaves*100)+"%";
-    setTimeout(()=>runWave(floor,mission), 900);
+    beginTravelPause(floor,mission);
     return;
   }
   if(nodeType==="rest"){
@@ -4678,7 +4677,7 @@ runWave=function(floor,mission){
     document.getElementById("d-wave").textContent="Wave "+G.waveNum+"/"+G.totalWaves;
     document.getElementById("d-prog").style.width=Math.round((G.waveNum-1)/G.totalWaves*100)+"%";
     renderHUD();
-    setTimeout(()=>runWave(floor,mission), 900);
+    beginTravelPause(floor,mission);
     return;
   }
   if(nodeType==="elite"){
@@ -5147,7 +5146,7 @@ function patrolTick(){
   const bfRect=bf&&typeof bf.getBoundingClientRect==="function"?bf.getBoundingClientRect():null;
   const zones=PROP_KEEPOUT_ZONES[G.curArenaZoneKey]||null;
   document.querySelectorAll(".bf-hero-lanes .sprite-pos").forEach(el=>{
-    if(G.combatActive) return; // heroes hold position once a fight is actually on
+    if(G.combatActive&&!G.isTraveling) return; // heroes hold position mid-fight, but wander freely during a travel pause
     const {dx,dy}=pickWanderOffset(el,bfRect,26,18,zones);
     el.style.transform=`translate(${dx}px,${dy}px)`;
   });
@@ -5469,16 +5468,6 @@ function renderFloorMapStrip(){
     const prevLeft=parseFloat(dot.style.left)||newLeftPct, prevTop=parseFloat(dot.style.top)||newTopPct;
     const actuallyMoving=Math.abs(newLeftPct-prevLeft)>0.5||Math.abs(newTopPct-prevTop)>0.5;
     if(actuallyMoving){
-      // fading trail: a couple of small dots interpolated between the old and new spot, so the eye has
-      // something to track the motion itself, not just the destination
-      for(let t=1;t<=2;t++){
-        const frac=t/3;
-        const trailDot=document.createElement("div");
-        trailDot.style.cssText=`position:absolute;left:${prevLeft+(newLeftPct-prevLeft)*frac}%;top:${prevTop+(newTopPct-prevTop)*frac}%;width:6px;height:6px;border-radius:50%;background:var(--hgold);transform:translate(-50%,-50%);opacity:0.55;transition:opacity 0.9s ease`;
-        markerLayer.appendChild(trailDot);
-        setTimeout(()=>{ trailDot.style.opacity="0"; },50);
-        setTimeout(()=>{ if(trailDot.parentNode) trailDot.parentNode.removeChild(trailDot); },1000);
-      }
       dot.classList.add("walking");
       setTimeout(()=>{ dot.classList.remove("walking"); },700);
     }
@@ -5545,6 +5534,33 @@ function showNodeChoicePrompt(slotIdx,onDone){
       });
     }
   }
+}
+</script>
+<script>
+/* ============================================================
+   Pass 42 — real travel time between encounters, so the party
+   doesn't just teleport from one fight straight into the next
+   ============================================================ */
+function beginTravelPause(floor,mission){
+  G.isTraveling=true;
+  const ah=G.cHeroes.filter(h=>h.isAlive&&h.hp>0&&!h.isReserve);
+  if(ah.length) addLog("flavor","💭",pick(IDLE)(pick(ah).name));
+  addLog("floor","🚶","The party moves cautiously deeper, wary of what's ahead...");
+  const bf=document.getElementById("battlefield");
+  let travelMsg=document.getElementById("bf-travel-msg");
+  if(!travelMsg&&bf){
+    travelMsg=document.createElement("div");
+    travelMsg.id="bf-travel-msg";
+    travelMsg.style.cssText="position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:9;background:rgba(0,0,0,.55);color:#F5D9A8;font-size:11px;font-weight:600;padding:6px 14px;border-radius:99px;pointer-events:none";
+    bf.appendChild(travelMsg);
+  }
+  if(travelMsg){ travelMsg.textContent="The party moves deeper into the dungeon..."; travelMsg.style.display="block"; }
+  const duration=Math.max(1400,3200/G.combatSpd); // a real travel beat, with a floor so even max speed keeps some pacing
+  setTimeout(()=>{
+    G.isTraveling=false;
+    if(travelMsg) travelMsg.style.display="none";
+    runWave(floor,mission);
+  },duration);
 }
 </script>
 <script>
