@@ -5556,6 +5556,12 @@ function beginTravelPause(floor,mission){
   }
   if(travelMsg){ travelMsg.textContent="The party moves deeper into the dungeon..."; travelMsg.style.display="block"; }
   const duration=Math.max(1400,3200/G.combatSpd); // a real travel beat, with a floor so even max speed keeps some pacing
+  // let the death animation actually finish (~850ms) before clearing the corpse — otherwise it either lingers
+  // the whole pause (the bug) or vanishes mid-animation if cleared too early
+  setTimeout(()=>{
+    G.curEnemies=[];
+    renderBattlefield();
+  },900);
   setTimeout(()=>{
     G.isTraveling=false;
     if(travelMsg) travelMsg.style.display="none";
