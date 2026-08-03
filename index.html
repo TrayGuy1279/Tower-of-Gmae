@@ -1117,7 +1117,7 @@ function renderRoster(){
   el.innerHTML=sortedRoster().map(h=>{const c=RC[h.rarity];const ip=G.party.includes(h.id);const occ=heroOccupied(h.id);return`<div class="hero-row${ip?" inparty":""}${G.selHero===h.id?" sel":""}" onclick="selHero('${h.id}')">
     <div class="av" style="background:${c.bg};color:${c.tx}">${initials(h.name)}</div>
     <div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:4px">${h.isInjured?ico('bandage',10,'var(--red-tx)'):""}${weaponIconSm(h)}<span style="font-size:10px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.name}</span><span style="font-size:8px;color:var(--gold);flex-shrink:0">${"★".repeat(h.rarity+1)}</span></div>
-    <div style="font-size:9px;color:var(--text2)">${h.cls}·${h.wpn}·Lv${h.lv}${h.hybridClass?"·"+h.hybridClass:h.prodClass?"·"+h.prodClass:""}${ip?"·<span style='color:var(--green-tx)'>party</span>":""}${occ?"·<span style='color:var(--purple-tx)'>busy</span>":""}</div></div></div>`;}).join("");}
+    <div style="font-size:9px;color:var(--text2)">${h.cls}·${h.wpn}·Lv${h.lv}${h.hybridClass?"·"+h.hybridClass:h.prodClass?"·"+h.prodClass:""}${h.roleMarker?`·<span style="color:var(--gold-tx)">${h.roleMarker==="blacksmith"?"🔨":"⛏"} ${h.roleMarker}</span>`:""}${ip?"·<span style='color:var(--green-tx)'>party</span>":""}${occ?"·<span style='color:var(--purple-tx)'>busy</span>":""}</div></div></div>`;}).join("");}
 function renderPartySlots(){
   const el=document.getElementById("party-slots"),pc=document.getElementById("pcount");
   if(!el)return;if(pc)pc.textContent=G.party.length;
@@ -1134,14 +1134,36 @@ function isHeroInAnyParty(id){
 }
 function addParty(id){if(G.party.length>=5||isHeroInAnyParty(id))return;const h=G.roster.find(x=>x.id===id);if(h?.isInjured||craftOccupied(id))return;G.party.push(id);if(!G.formation[id])G.formation[id]=defaultRole(h);renderRoster();renderPartySlots();renderFormationEditor();if(G.selHero===id)selHero(id);}
 function removeParty(id){G.party=G.party.filter(x=>x!==id);delete G.formation[id];renderRoster();renderPartySlots();renderFormationEditor();if(G.selHero===id)selHero(id);}
-function setRole(id,role){G.formation[id]=role;renderFormationEditor();}
+function setRole(id,role){G.formation[id]=role;renderFormationEditor();renderRoster();}
+function toggleRoleMarker(id,marker){
+  const h=G.roster.find(x=>x.id===id);if(!h)return;
+  h.roleMarker=h.roleMarker===marker?null:marker;
+  renderRoster();
+  if(G.selHero===id)selHero(id);
+}
+function moveInRole(id,dir){
+  const h=G.roster.find(x=>x.id===id);if(!h)return;
+  const role=G.formation[id]||defaultRole(h);
+  if(!G.formationOrder)G.formationOrder={};
+  const inRole=G.party.map(pid=>G.roster.find(x=>x.id===pid)).filter(Boolean).filter(ph=>(G.formation[ph.id]||defaultRole(ph))===role);
+  inRole.sort((a,b)=>((G.formationOrder[a.id])||0)-((G.formationOrder[b.id])||0));
+  inRole.forEach((ph,i)=>{G.formationOrder[ph.id]=i;}); // normalize to clean sequential values first, so ties (the common untouched case) resolve predictably
+  const idx=inRole.findIndex(ph=>ph.id===id);
+  const swapIdx=idx+dir;
+  if(swapIdx<0||swapIdx>=inRole.length)return;
+  const tmp=G.formationOrder[inRole[idx].id];
+  G.formationOrder[inRole[idx].id]=G.formationOrder[inRole[swapIdx].id];
+  G.formationOrder[inRole[swapIdx].id]=tmp;
+  renderFormationEditor();
+}
 function renderFormationEditor(){
   const el=document.getElementById("formation-editor");if(!el)return;
   if(!G.party.length){el.innerHTML=`<div class="empty" style="font-size:10px;padding:14px">Add heroes in Barracks first</div>`;return;}
   const roleOrder={frontline:0,core:1,backline:2};
   const heroes=G.party.map(id=>G.roster.find(x=>x.id===id)).filter(Boolean).sort((a,b)=>{
     const ra=roleOrder[G.formation[a.id]||defaultRole(a)],rb=roleOrder[G.formation[b.id]||defaultRole(b)];
-    return ra-rb;
+    if(ra!==rb) return ra-rb;
+    return ((G.formationOrder&&G.formationOrder[a.id])||0)-((G.formationOrder&&G.formationOrder[b.id])||0);
   });
   const bestDmg=heroes.reduce((best,h)=>h.str>(best?best.str:-1)?h:best,null);
   el.innerHTML=`<div class="label">Formation</div>
@@ -1155,6 +1177,10 @@ function renderFormationEditor(){
       return`<div class="fh-chip">
         ${weaponIconSm(h)}
         <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.name}${tracker?` <span class="fh-tracker-tag">◎ takes point</span>`:""}${rec?` <span class="fh-tracker-tag" style="color:var(--green-tx)">★ core pick</span>`:""}${misplaced?` <span class="fh-tracker-tag" style="color:var(--red-tx)">⚠ suited to ${idealRole==="frontline"?"Frontline":"Backline"}</span>`:""}</span>
+        <div class="fh-order-btns" style="display:flex;flex-direction:column;gap:1px">
+          <button class="fh-role-btn" style="font-size:8px;padding:0 4px" onclick="moveInRole('${h.id}',-1)" title="Move up within ${role}">▲</button>
+          <button class="fh-role-btn" style="font-size:8px;padding:0 4px" onclick="moveInRole('${h.id}',1)" title="Move down within ${role}">▼</button>
+        </div>
         <div class="fh-role-btns">
           <button class="fh-role-btn${role==="frontline"?" active":""}" onclick="setRole('${h.id}','frontline')">F</button>
           <button class="fh-role-btn${role==="core"?" active":""}" onclick="setRole('${h.id}','core')">C</button>
@@ -1180,7 +1206,11 @@ function selHero(id){G.selHero=id;renderRoster();const h=G.roster.find(x=>x.id==
       <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700">${h.name}</div><div style="font-size:10px;color:var(--gold);font-weight:700">${"★".repeat(h.rarity+1)}</div>
       <div style="font-size:10px;color:var(--text2)">${h.cls} · ${h.wpn} · Lv.${h.lv} (${h.xp}/${h.lv*60+120} XP)${h.hybridClass?` <span class="sbadge">${h.hybridClass}</span>`:h.prodClass?` <span class="sbadge">${h.prodClass}</span>`:""}</div>
       <div style="font-size:9px;margin-top:2px"><span class="m-${h.mentality||"neutral"}">${mLabel}</span>${h.isInjured?`<span style="font-size:9px;color:var(--red-tx);margin-left:5px">Injured until floor ${h.injFloor}</span>`:""}${heroOccupied(h.id)?`<span style="font-size:9px;color:var(--purple-tx);margin-left:5px">Currently occupied</span>`:""}</div>
-      ${(()=>{const g=topGrudge(h);return g?`<div style="font-size:9px;margin-top:2px;color:var(--red-tx);font-weight:700">${g.tier} vs ${g.enemyName} <span style="font-weight:400;color:var(--text2)">(${g.count} encounters)</span></div>`:"";})()}</div>
+      ${(()=>{const g=topGrudge(h);return g?`<div style="font-size:9px;margin-top:2px;color:var(--red-tx);font-weight:700">${g.tier} vs ${g.enemyName} <span style="font-weight:400;color:var(--text2)">(${g.count} encounters)</span></div>`:"";})()}
+      <div style="display:flex;gap:5px;margin-top:5px">
+        <button class="btn${h.roleMarker==="blacksmith"?" btn-g":""}" style="font-size:9px;padding:3px 8px" onclick="toggleRoleMarker('${h.id}','blacksmith')">🔨 Blacksmith</button>
+        <button class="btn${h.roleMarker==="gatherer"?" btn-g":""}" style="font-size:9px;padding:3px 8px" onclick="toggleRoleMarker('${h.id}','gatherer')">⛏ Gatherer</button>
+      </div></div>
       <div style="flex-shrink:0;align-self:flex-start">
         ${!ip&&G.party.length<5&&!h.isInjured&&!craftOccupied(h.id)?`<button class="btn btn-g" onclick="addParty('${h.id}')">+ Party</button>`:""}
         ${ip?`<button class="btn btn-r" onclick="removeParty('${h.id}')">Remove</button>`:""}
@@ -1338,6 +1368,7 @@ function renderBattlefield(){
   if(!G.combatActive)idleMsg.textContent="";
   const lanes={backline:[],core:[],frontline:[]};
   heroSource.forEach(h=>{const base=G.roster.find(x=>x.id===h.id)||h;const role=G.formation[h.id]||defaultRole(base);(lanes[role]||lanes.core).push(h);});
+  Object.keys(lanes).forEach(role=>{lanes[role].sort((a,b)=>((G.formationOrder&&G.formationOrder[a.id])||0)-((G.formationOrder&&G.formationOrder[b.id])||0));});
   heroesEl.innerHTML=["backline","core","frontline"].map(role=>`<div class="bf-lane"><div class="bf-lane-label">${role}</div>${lanes[role].map(h=>heroSpriteHtml(h)).join("")}</div>`).join("");
   enemiesEl.innerHTML=G.curEnemies.map((e,i)=>(e.hp>0||(e.deadAt&&Date.now()-e.deadAt<850))?enemySpriteHtml(e,i):"").join("");
 }
@@ -2295,7 +2326,7 @@ function beginSparring(){
   if(!h1||!h2||h1===h2){alert("Pick two different heroes.");return;}
   if(startSession("training","sparring",h1,null,{},300000*trainTimeMult(),false,h2))renderBldContent("training",2);
 }
-function doImbueEnhancement(enhId){const heroSel=document.getElementById("enh-hero-"+enhId);if(!heroSel||!heroSel.value)return;applyEnhancement(heroSel.value,enhId);renderBldContent("training",3);}
+function doImbueEnhancement(enhId){if(!G.enhanceTargetId)return;applyEnhancement(G.enhanceTargetId,enhId);renderBldContent("training",3);}
 
 /* ===================== ABSORPTION CHAMBER ===================== */
 function renderAbsorption(tab,el){
@@ -2797,7 +2828,8 @@ function renderTraining(tab,el){
   if(tab===0){
     el.innerHTML=finishBtn+`<div class="label">Weapon mastery</div><div style="font-size:9px;color:var(--text2);margin-bottom:8px">Raises the hero's weapon mastery level, granting a small combat stat bonus.</div>
     ${heroes.length?heroes.map(h=>{const cur=(h.wm&&h.wm[h.wpn])||1;const maxed=cur>=20;const dur=masteryTrainTime(h);
-      return`<div class="box p12" style="display:flex;align-items:center;gap:8px;margin-bottom:6px">${weaponIconSm(h)}<span style="flex:1;font-size:11px">${h.name}${stars(h)} — ${h.wpn} Lv.${cur}/20</span><button class="btn btn-p" style="font-size:9px" ${maxed||bldFull("training")?"disabled":""} onclick="beginMastery('${h.id}')">${maxed?"Maxed":"Train ("+formatDuration(dur)+")"}</button></div>`;
+      const resting=h.trainExhaustedUntil&&Date.now()<h.trainExhaustedUntil;const restMin=resting?Math.ceil((h.trainExhaustedUntil-Date.now())/60000):0;
+      return`<div class="box p12" style="display:flex;align-items:center;gap:8px;margin-bottom:6px">${weaponIconSm(h)}<span style="flex:1;font-size:11px">${h.name}${stars(h)} — ${h.wpn} Lv.${cur}/20</span><button class="btn btn-p" style="font-size:9px" ${maxed||resting||bldFull("training")?"disabled":""} onclick="beginMastery('${h.id}')">${maxed?"Maxed":resting?"Resting "+restMin+"m":"Train ("+formatDuration(dur)+")"}</button></div>`;
     }).join(""):'<div class="empty">No eligible heroes</div>'}
     ${sessionListHtml("training",["mastery"])}`;
   } else if(tab===1){
@@ -2823,9 +2855,13 @@ function renderTraining(tab,el){
     const eligible=sortHeroesStd(G.roster.filter(h=>h.lv>=ENHANCEMENT_UNLOCK_LEVEL&&!isNobleMage(h)));
     const nobleCount=G.roster.filter(h=>h.lv>=ENHANCEMENT_UNLOCK_LEVEL&&isNobleMage(h)).length;
     el.innerHTML=`<div class="label" style="margin-top:6px">Imbue Enhancement Stones</div><div style="font-size:9px;color:var(--text2);margin-bottom:8px">Heroes must be Lv.${ENHANCEMENT_UNLOCK_LEVEL}+, max ${ENHANCEMENT_CAP_PER_HERO} per hero. Noble-born Mages refuse Enhancements outright — they consider it barbaric. A commoner-born Mage has no such objection.${nobleCount?` (${nobleCount} noble Mage${nobleCount>1?"s":""} sitting this out)`:""}</div>
+    <div class="box p12" style="margin-bottom:8px;border-color:var(--gold)"><div class="label" style="margin-bottom:4px">Enhancement Target</div><div style="font-size:9px;color:var(--text2);margin-bottom:5px">Pick once — every stone below imbues into this hero until you change it.</div>
+    <select id="enh-target-hero" onchange="G.enhanceTargetId=this.value" style="font-size:10px;padding:4px;width:100%;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--bg);color:var(--text)">${heroSelectOptions(eligible)}</select></div>
     ${!owned.length?'<div class="empty">No Enhancement Stones owned — earned from floor loot or Raids</div>':owned.map(s=>`<div class="box p12" style="margin-bottom:6px"><div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">${s.icon}<span style="flex:1;font-size:11px">${s.name} ×${G.inv[s.id]}</span></div><div style="font-size:9px;color:var(--text2);margin-bottom:5px">${s.desc}</div>
-    <select id="enh-hero-${s.id}" style="font-size:10px;padding:4px;width:100%;margin-bottom:5px;border-radius:var(--radius-md);border:1.5px solid var(--border);background:var(--bg);color:var(--text)">${heroSelectOptions(eligible)}</select>
     <button class="btn btn-o" style="width:100%" ${eligible.length?"":"disabled"} onclick="doImbueEnhancement('${s.id}')">Imbue</button></div>`).join("")}`;
+    const targetSel=document.getElementById("enh-target-hero");
+    if(targetSel&&G.enhanceTargetId&&eligible.some(h=>h.id===G.enhanceTargetId)) targetSel.value=G.enhanceTargetId;
+    else if(targetSel&&targetSel.value) G.enhanceTargetId=targetSel.value;
   } else el.innerHTML=logTabHtml("training");
 }
 const TRAINING_KIND_LABELS={mastery:"trained weapon mastery",skillup:"trained a skill",conditioning:"completed conditioning",sparring:"sparred"};
