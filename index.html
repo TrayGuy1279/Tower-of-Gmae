@@ -630,7 +630,7 @@ function weaponIcon(cls,wpn,size){
   size=size||16;
   if(cls==="Mage") return ico('orb',size,MAGE_ELEM_COLORS[wpn]||"currentColor");
   const key=WPN_ICON_MAP[wpn];
-  if(key==="axe1"||key==="staff") return extraIco(key,size);
+  if(key==="axe1"||key==="staff"||key==="mace1") return extraIco(key,size);
   return ico(key||'sword',size);
 }
 // per-(class,weapon) icon caches at common sizes, so hot render loops (battlefield) aren't rebuilding SVG strings every frame
